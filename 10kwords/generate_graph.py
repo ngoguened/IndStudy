@@ -1,12 +1,15 @@
 import numpy as np
-import pickle
 import networkx as nx
 from sklearn.neighbors import NearestNeighbors
 import sys
 import os
+import requests
+import torch
 
 # Config defaults
-K_CANDIDATES = 30
+WORD_LIST_URL = "https://raw.githubusercontent.com/first20hours/google-10000-english/master/google-10000-english.txt"
+
+K_CANDIDATES = 20
 M_EDGES = 6
 
 def load_vectors(embedding_file):
@@ -14,9 +17,9 @@ def load_vectors(embedding_file):
         raise FileNotFoundError(f"{embedding_file} not found.")
     
     with open(embedding_file, "rb") as f:
-        data = pickle.load(f)
-    words = list(data.keys())
-    vectors = np.array(list(data.values()), dtype='float32')
+        data = torch.load(f)
+    words = requests.get(WORD_LIST_URL).text.strip().split('\n')[:10000]
+    vectors = np.array(data, dtype='float32')
     return words, vectors
 
 def build_small_world(words, vectors):
@@ -48,9 +51,9 @@ def build_small_world(words, vectors):
                 # Cosine Dist = 1 - Dot
                 dist_between_neighbors = 1.0 - np.dot(vec_candidate, vec_selected)
                 
-                if dist_between_neighbors < dist_to_source:
-                    is_redundant = True
-                    break
+                # if dist_between_neighbors < dist_to_source:
+                #     is_redundant = True
+                #     break
             
             if not is_redundant:
                 selected_neighbors.append(candidate_id)
@@ -91,4 +94,4 @@ def create_graph_from_embeddings(embedding_path, output_graph_path):
         sys.exit(1)
 
 if __name__ == "__main__":
-    create_graph_from_embeddings("data/embeddings.pkl", "data/small_world.gexf")
+    create_graph_from_embeddings("data/embeddings.pth", "data/small_world.gexf")
