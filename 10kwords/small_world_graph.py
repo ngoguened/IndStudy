@@ -42,8 +42,7 @@ def explore_mode(G):
         options = []
         for i, (nbr, weight) in enumerate(neighbors):
             percent = weight * 100
-            link_type = "[LOCAL]" if percent > 80 else "[JUMP] " if percent > 60 else "[HIGHWAY]"
-            print(f"  {i+1}. {link_type:<9} {nbr:<15} (Sim: {percent:.1f}%)")
+            print(f"  {i+1}. {nbr:<15} (Sim: {percent:.1f}%)")
             options.append(nbr)
             
         if not options: print("  (Dead End!)")
@@ -88,8 +87,7 @@ def challenge_mode(G):
         options = []
         for i, (nbr, weight) in enumerate(neighbors):
             percent = weight * 100
-            link_type = "[LOCAL]" if percent > 80 else "[JUMP] " if percent > 60 else "[HIGHWAY]"
-            print(f"  {i+1}. {link_type:<9} {nbr:<15} (Sim: {percent:.1f}%)")
+            print(f"  {i+1}. {nbr:<15} (Sim: {percent:.1f}%)")
             options.append(nbr)
             
         cmd = input("\n[number] move, 'back' give up > ").strip().lower()
