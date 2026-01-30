@@ -2,6 +2,13 @@ import networkx as nx
 import os
 import sys
 import random
+import csv
+from prompt_toolkit import prompt
+from prompt_toolkit.completion import WordCompleter
+
+import generate_graph
+
+OUTPUT_CSV = "data/human_results.csv"
 
 def load_graph(graph_file):
     if not os.path.exists(graph_file):
@@ -58,7 +65,13 @@ def explore_mode(G):
         elif cmd: input(f"Word '{cmd}' not found...")
 
 def challenge_mode(G):
+    if not os.path.exists(OUTPUT_CSV):
+        with open(OUTPUT_CSV, mode='w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(["k_nn", "k_random", "start_word", "target_word", "success", "ai_path_len", "optimal_len", "diff"])
+
     nodes = list(G.nodes())
+    
     while True:
         start_word, target_word = random.choice(nodes), random.choice(nodes)
         if start_word != target_word:
@@ -70,9 +83,16 @@ def challenge_mode(G):
     
     current_word = start_word
     path = [start_word]
+    success = False
     
     while True:
+        if len(path)-1 == 50:
+            print(f"\nGAME OVER. Too many steps. Optimal path:\n{' -> '.join(optimal_path)}")
+            input("Press Enter...")
+            break
+
         if current_word == target_word:
+            success = True
             print(f"\n\n*** VICTORY! ***\nPath: {' -> '.join(path)}")
             print(f"Optimal ({optimal_dist}): {' -> '.join(optimal_path)}")
             input("Press Enter...")
@@ -85,22 +105,44 @@ def challenge_mode(G):
         
         neighbors = get_neighbors_from_graph(G, current_word)
         options = []
+        neighbor_names = []
+
         for i, (nbr, weight) in enumerate(neighbors):
             percent = weight * 100
             print(f"  {i+1}. {nbr:<15} (Sim: {percent:.1f}%)")
             options.append(nbr)
-            
-        cmd = input("\n[number] move, 'back' give up > ").strip().lower()
+            neighbor_names.append(nbr)
+
+        search_completer = WordCompleter(neighbor_names, ignore_case=True, match_middle=True)
+ 
+        try:
+            cmd = prompt("> ", completer=search_completer).strip().lower()
+        except KeyboardInterrupt:
+            cmd = "back"
+
         if cmd == 'back': 
             print(f"\nGAME OVER. Optimal path:\n{' -> '.join(optimal_path)}")
             input("Press Enter...")
             break
-        
-        if cmd.isdigit():
+    
+        word_match = next((word for word in options if word.lower() == cmd), None)
+
+        if word_match:
+            current_word = word_match
+            path.append(current_word)
+            
+        elif cmd.isdigit():
             idx = int(cmd) - 1
             if 0 <= idx < len(options):
                 current_word = options[idx]
                 path.append(current_word)
+
+    path_len = len(path)-1 if success else -1
+    diff = path_len-optimal_dist if success else -1
+
+    with open(OUTPUT_CSV, mode='a', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow([generate_graph.K, generate_graph.K_RANDOM, start_word, target_word, success, path_len, optimal_dist, diff])
 
 def launch_explorer(graph_file_path):
     """
