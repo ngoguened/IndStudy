@@ -8,7 +8,7 @@ from prompt_toolkit.completion import WordCompleter
 
 import generate_graph
 
-OUTPUT_CSV = "data/human_results.csv"
+OUTPUT_CSV = "data/human_results_prob.csv"
 
 def load_graph(graph_file):
     if not os.path.exists(graph_file):
@@ -68,7 +68,7 @@ def challenge_mode(G):
     if not os.path.exists(OUTPUT_CSV):
         with open(OUTPUT_CSV, mode='w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow(["k_nn", "k_random", "start_word", "target_word", "success", "ai_path_len", "optimal_len", "diff"])
+            writer.writerow(["k_nn", "density", "start_word", "target_word", "success", "ai_path_len", "optimal_len", "diff"])
 
     nodes = list(G.nodes())
     
@@ -142,7 +142,7 @@ def challenge_mode(G):
 
     with open(OUTPUT_CSV, mode='a', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow([generate_graph.K, generate_graph.K_RANDOM, start_word, target_word, success, path_len, optimal_dist, diff])
+        writer.writerow([generate_graph.K, generate_graph.DENSITY, start_word, target_word, success, path_len, optimal_dist, diff])
 
 def launch_explorer(graph_file_path):
     """

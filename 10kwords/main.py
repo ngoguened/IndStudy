@@ -28,14 +28,20 @@ def main():
 
     # 2. Check/Run Graph Generation
     if not os.path.exists(GRAPH_FILE):
-        print(f"[2/3] Missing {GRAPH_FILE}. Building graph...")
+        print(f"[2/3] Missing {GRAPH_FILE}.")
         
         if not os.path.exists(EMBEDDING_FILE):
             print("Embeddings missing. Cannot generate graph.")
             sys.exit(1)
             
         # Pass input and output paths explicitly
-        generate_graph.create_graph_from_embeddings(EMBEDDING_FILE, GRAPH_FILE)
+        print("what do you want K to be")
+        k = int(input())
+        print("what do you want N to be")
+        n = int(input())
+        print("what algorithm do you want? (random or probabilistic)")
+        algorithm = input()
+        generate_graph.create_graph_from_embeddings(EMBEDDING_FILE, GRAPH_FILE, k, n, algorithm)
     else:
         print(f"[2/3] Found existing graph.")
 
