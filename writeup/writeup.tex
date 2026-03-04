@@ -1,0 +1,73 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+\usepackage{acronym}
+
+\title{Traversing Embeddings}
+\author{Nicholas, Kenny}
+\date{}
+
+\begin{document}
+
+\acrodef{RNG}{Relative Neighborhood Graph}
+\acrodef{k-NN}{K-Nearest Neighbors}
+
+
+\maketitle
+
+\section{Introduction}
+
+Current recommendation algorithms optimize for engagement metrics. The limitation of engagement metrics is that once a user's preferences are understood, the recommendation algorithm stops showing new types of content. Here we study how graph construction of the content embedding space can allow users to intuitively traverse to content they are interested in.
+
+Roadmap:
+\begin{itemize} 
+    \item 10k words embedding space:
+    \begin{itemize}
+        \item Analyze traversal types
+        \item Analyze graph construction types
+        \item Analyze embeddings
+        \item ** Hopefully by this point, it is clear that humans can navigate the embedding space to content they are interested in "quickly". **
+    \end{itemize}
+    \item Bluesky posts embedding space:
+    \begin{itemize}
+        \item Analyze navigability of more complex embedding graph
+        \item Construct a recommendation system using graph
+        \item Test recommendation system
+    \end{itemize}
+\end{itemize}
+
+\section{Methods}
+
+\subsection{Types of Traversal}
+
+\subsubsection{Greedy Search}
+Let $G = (V, E)$ be the semantic graph where each node $v \in V$ is associated with an embedding vector $\mathbf{v}$. Given a start node $s$ and a target node $t$, the greedy search algorithm iteratively selects the next node $v_{next}$ from the neighborhood of the current node $v_{curr}$ that maximizes the cosine similarity with the target vector $\mathbf{t}$. Formally, $v_{next} = \arg\max_{u \in N(v_{curr})} \cos(\mathbf{u}, \mathbf{t})$, where $N(v_{curr})$ denotes the adjacent neighbors of $v_{curr}$.
+
+\subsubsection{Human Search}
+Human search evaluates the navigability of the embedding space by human actors. The objective is to determine whether human participants can discover paths from a source node $s$ to a target node $t$ with lengths comparable to those found by the greedy algorithm. Success in this task implies that the graph structure aligns with human semantic intuition, allowing users to effectively navigate toward content of interest.
+
+\subsection{Graph Generation Algorithms}
+We explore several graph construction methods aimed at enabling the discovery of an arbitrary target node in logarithmic time, a defining characteristic of navigable small-world networks \cite{DBLP:journals/corr/MalkovY16}.
+
+\subsubsection{\ac{RNG}}
+The \ac{RNG} is an undirected graph connecting two nodes if and only if there exists no third node that is closer to both than they are to each other. Mathematically, an edge $(u, v)$ exists if and only if $\not\exists w \in V$ such that $\max(d(u, w), d(v, w)) < d(u, v)$ \cite{TOUSSAINT1980261}.
+
+\subsubsection{\ac{k-NN} and n-Random}
+To facilitate rapid traversal within dense clusters, we implemented a directed graph constructed via \ac{k-NN}. For each node, directed edges are formed to its $k$ closest neighbors in the embedding space. To prevent the graph from consisting solely of local, intra-cluster connections, we introduce $n$ additional uniformly distributed random edges per node, connecting to nodes outside of the selected $k$ neighbors. This approach seeks to balance local exploitability with global reachability.
+
+\subsubsection{Probabilistic and Inverted \ac{k-NN}}
+To improve upon previous methods, we construct a graph integrating two distinct edge types. First, we compute the \ac{k-NN} for each node and introduce inverted directed edges (i.e., edges directed from the $k$-nearest neighbors to the node itself). Second, we add long-range connections sampled probabilistically, where the probability $P(u, v)$ of forming an edge from node $u$ to node $v$ is proportional to their cosine similarity: $P(u, v) \propto \max(0, \cos(\mathbf{u}, \mathbf{v}))$. While computationally intensive during graph generation, this structure can be serialized for subsequent exploration. We experiment with varying $k$ and the number of probabilistic edges to optimize graph navigability for the greedy algorithm.
+
+\section{Results}
+
+\subsection{Graph Generation Performance}
+
+\subsubsection{\ac{RNG}}
+The \ac{RNG} created fully connected graphs that could be navigated to different semantic concepts in a small number of steps. However, this approach did not have a good way to quickly traverse within a dense cluster.
+
+\subsubsection{\ac{k-NN} and n-Random}
+This approach would make fully connected graphs that were easier to navigate once you were close semantically to a word, but it was difficult to approach the word since the random connected nodes had no semantic similarity to the node it was connected to, making traversal semi-random. Also, some parts of the space with nearby clusters are difficult to jump to, since the connected nodes would be part of its own cluster.
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

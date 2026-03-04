@@ -51,7 +51,6 @@ def main():
     # Paths mapped cleanly
     os.makedirs(args.data_dir, exist_ok=True)
     embed_file = os.path.join(args.data_dir, f"embeddings_{args.embedding}.pkl")
-    print(embed_file)
     graph_file = os.path.join(args.data_dir, f"graph_{args.embedding}_{args.graph}_k{args.k}_n{args.n}.gexf")
 
     print(f"\\n=== SMALL WORLD PIPELINE: {args.embedding.upper()} -> {args.graph.upper()} ===")

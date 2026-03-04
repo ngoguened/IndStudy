@@ -5,9 +5,22 @@ import random
 
 import json
 from sqlalchemy import text
+from st_keyup import st_keyup
+import streamlit.components.v1 as components
 
 # App configuration
 st.set_page_config(page_title="10kwords Challenge Mode", page_icon="🕸️", layout="centered")
+
+# Custom CSS for bigger buttons
+st.markdown("""
+<style>
+div[data-testid="stButton"] button {
+    min-height: 60px;
+    font-size: 18px;
+    font-weight: bold;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # Paths & Graphs
 DATA_DIR = "/home/nicholas/IdeaProjects/IndStudy/10kwords/data"
@@ -172,7 +185,10 @@ col1, col2 = st.columns(2)
 with col1:
     st.metric(label="Target Word", value=st.session_state.target_word.upper())
 with col2:
-    st.metric(label="Steps", value=f"{steps_taken} / {max_steps}", delta=f"Optimal: {st.session_state.optimal_dist}", delta_color="off")
+    if st.session_state.game_over:
+        st.metric(label="Steps", value=f"{steps_taken} / {max_steps}", delta=f"Optimal: {st.session_state.optimal_dist}", delta_color="off")
+    else:
+        st.metric(label="Steps", value=f"{steps_taken} / {max_steps}")
 
 st.markdown(f"**Current Location:**  `{st.session_state.current_word.upper()}`")
 
@@ -183,9 +199,9 @@ with st.expander("Show current path"):
 # Game over screens
 if st.session_state.game_over:
     if st.session_state.success:
-        st.success(f"🎉 **VICTORY!** You reached **{st.session_state.target_word.upper()}** in {steps_taken} steps!")
+        st.success(f"**VICTORY!** You reached **{st.session_state.target_word.upper()}** in {steps_taken} steps!")
     else:
-        st.error(f"💀 **GAME OVER.** You exceeded the maximum of {max_steps} steps.")
+        st.error(f"**GAME OVER.** You exceeded the maximum of {max_steps} steps.")
     
     st.info(f"**Optimal Path ({st.session_state.optimal_dist} steps):**\n" + " -> ".join(st.session_state.optimal_path))
     st.button("Play Again", on_click=restart_game, type="primary")
@@ -199,25 +215,56 @@ else:
     else:
         options = [nbr for nbr, weight in neighbors]
         
-        # Prepare display labels
-        display_options = {}
-        for nbr, weight in neighbors:
-            display_options[nbr] = f"{nbr} (Sim: {weight*100:.1f}%)"
+        if "filter_key_counter" not in st.session_state:
+            st.session_state.filter_key_counter = 0
             
         def on_move(selected):
             st.session_state.current_word = selected
             st.session_state.path.append(selected)
+            st.session_state.filter_key_counter += 1
                 
         st.markdown("**Choose your next word:**")
+        filter_text = st_keyup("Filter available words...", key=f"word_filter_{st.session_state.filter_key_counter}")
         
-        # Display as a grid of buttons (3 columns)
-        cols = st.columns(3)
-        for i, option in enumerate(options):
-            with cols[i % 3]:
-                st.button(
-                    display_options[option], 
-                    key=f"btn_{option}_{steps_taken}_{i}", 
-                    on_click=on_move, 
-                    args=(option,),
-                    use_container_width=True
-                )
+        # Autofocus hack
+        components.html(
+            f"""
+            <script>
+                // We need a slight delay to ensure the component is fully rendered
+                setTimeout(function() {{
+                    var iframe = window.parent.document.querySelector('iframe[title="st_keyup.st_keyup"]');
+                    if (iframe && iframe.contentDocument) {{
+                        var input = iframe.contentDocument.querySelector('input');
+                        if (input) {{
+                            input.focus();
+                        }}
+                    }}
+                }}, 100);
+            </script>
+            """,
+            height=0,
+            width=0,
+        )
+        
+        # In case it's None initially to avoid errors
+        if filter_text is None:
+            filter_text = ""
+        else:
+            filter_text = filter_text.strip().lower()
+        
+        filtered_options = [opt for opt in options if filter_text in opt.lower()]
+        
+        if not filtered_options:
+            st.write("No words matching filter.")
+        else:
+            # Display as a grid of buttons (3 columns)
+            cols = st.columns(3)
+            for i, option in enumerate(filtered_options):
+                with cols[i % 3]:
+                    st.button(
+                        option, 
+                        key=f"btn_{option}_{steps_taken}_{i}", 
+                        on_click=on_move, 
+                        args=(option,),
+                        use_container_width=True
+                    )
