@@ -337,14 +337,13 @@ if should_log:
     )
 
 # UI: Status Information
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric(label="Target Word", value=st.session_state.target_word.upper())
+    st.metric(label="Start Word", value=st.session_state.start_word.upper())
 with col2:
-    if st.session_state.game_over:
-        st.metric(label="Steps", value=f"{steps_taken} / {max_steps}", delta=f"Optimal: {st.session_state.optimal_dist}", delta_color="off")
-    else:
-        st.metric(label="Steps", value=f"{steps_taken} / {max_steps}")
+    st.metric(label="Target Word", value=st.session_state.target_word.upper())
+with col3:
+    st.metric(label="Steps", value=f"{steps_taken} / {max_steps}")
 
 st.markdown(f"**Current Location:**  `{st.session_state.current_word.upper()}`")
 
