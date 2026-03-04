@@ -1,56 +1,103 @@
+import argparse
 import os
 import sys
+import csv
 
-# Import the functional modules
+# Import modules
 try:
-    import get_embeddings
-    import generate_graph
-    import small_world_graph
+    from embeddings import generate_embeddings, save_embeddings, load_embeddings, get_words_and_vectors
+    from graph import generate_graph, save_graph, load_graph, analyze_graph
+    from game import launch_cli_explorer, play_greedy_game
 except ImportError as e:
-    print(f"Error importing modules: {e}")
+    print(f"Error importing local modules: {e}")
     sys.exit(1)
 
-# --- Configuration Center ---
-DATA_DIR = "data"
-EMBEDDING_FILE = os.path.join(DATA_DIR, "embeddings.pkl")
-GRAPH_FILE = os.path.join(DATA_DIR, "small_world.gexf")
+def log_game_result(args, player_type, success, path, opt_path):
+    path_len = len(path) - 1 if success else -1
+    opt_len = len(opt_path) - 1
+    diff = path_len - opt_len if success else -1
+    path_str = " -> ".join(path)
+    start_w = path[0]
+    target_w = opt_path[-1]
+    
+    log_file = os.path.join(args.data_dir, "results.csv")
+    file_exists = os.path.exists(log_file)
+    with open(log_file, mode="a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["player", "embedding", "algorithm", "k_nn", "n_long", "start", "target", "success", "pth_len", "opt_len", "diff", "path_str"])
+        writer.writerow([player_type, args.embedding, args.graph, args.k, args.n, start_w, target_w, success, path_len, opt_len, diff, path_str])
+    print(f"\\n[Logged result to {log_file}]")
 
 def main():
-    print("=== SMALL WORLD PIPELINE ===\n")
+    parser = argparse.ArgumentParser(description="10kwords Semantic Graph Generator & Explorer")
+    
+    # Embedding specs
+    parser.add_argument("--embedding", type=str, choices=['gemini', 'glove'], default='gemini',
+                        help="Type of embeddings to use.")
+    
+    # Graph specs
+    parser.add_argument("--graph", type=str, 
+                        choices=['relative_neighborhood', 'k_nn+n_random', 'inv_knn+n_probabilistic'], 
+                        default='k_nn+n_random',
+                        help="Graph generation algorithm.")
+    parser.add_argument("-k", type=int, default=15, help="Number of nearest neighbors to connect.")
+    parser.add_argument("-n", type=int, default=10, help="Number of long range edges (random or probabilistic).")
+    
+    # Functional specs
+    parser.add_argument("--data_dir", type=str, default="data", help="Directory to save/load data.")
+    
+    args = parser.parse_args()
+    # Paths mapped cleanly
+    os.makedirs(args.data_dir, exist_ok=True)
+    embed_file = os.path.join(args.data_dir, f"embeddings_{args.embedding}.pkl")
+    print(embed_file)
+    graph_file = os.path.join(args.data_dir, f"graph_{args.embedding}_{args.graph}_k{args.k}_n{args.n}.gexf")
 
-    # 1. Check/Run Embeddings
-    if not os.path.exists(EMBEDDING_FILE):
-        print(f"[1/3] Missing {EMBEDDING_FILE}. Generating...")
-        # Call the specific function from the module
-        get_embeddings.generate_embeddings_file(EMBEDDING_FILE)
+    print(f"\\n=== SMALL WORLD PIPELINE: {args.embedding.upper()} -> {args.graph.upper()} ===")
+
+    # 1. Embeddings
+    if not os.path.exists(embed_file):
+        print(f"\\n[1/3] Generating {args.embedding} embeddings...")
+        embeddings = generate_embeddings(embedding_type=args.embedding)
+        save_embeddings(embeddings, embed_file)
     else:
-        print(f"[1/3] Found existing embeddings.")
+        print(f"\\n[1/3] Loading existing embeddings from {embed_file}...")
+        embeddings = load_embeddings(embed_file)
 
-    # 2. Check/Run Graph Generation
-    if not os.path.exists(GRAPH_FILE):
-        print(f"[2/3] Missing {GRAPH_FILE}.")
+    # 2. Graph
+    if not os.path.exists(graph_file):
+        print(f"\\n[2/3] Generating graph using {args.graph} algorithm...")
+        words, vectors = get_words_and_vectors(embeddings)
+        G = generate_graph(words, vectors, args.k, args.n, algorithm=args.graph)
+        analyze_graph(G)
+        save_graph(G, graph_file)
+    else:
+        print(f"\\n[2/3] Loading existing graph from {graph_file}...")
+        G = load_graph(graph_file)
+
+    # 3. Explore
+    print(f"\\n[3/3] Ready for Exploration!")
+    while True:
+        print("\\n=== MENU ===")
+        print("1. Human Challenge Mode (CLI)")
+        print("2. Greedy Search Demo")
+        print("3. Quit")
+        choice = input("> ").strip()
         
-        if not os.path.exists(EMBEDDING_FILE):
-            print("Embeddings missing. Cannot generate graph.")
-            sys.exit(1)
-            
-        # Pass input and output paths explicitly
-        print("what do you want K to be")
-        k = int(input())
-        print("what do you want N to be")
-        n = int(input())
-        print("what algorithm do you want? (random or probabilistic)")
-        algorithm = input()
-        generate_graph.create_graph_from_embeddings(EMBEDDING_FILE, GRAPH_FILE, k, n, algorithm)
-    else:
-        print(f"[2/3] Found existing graph.")
-
-    # 3. Launch Explorer
-    print(f"[3/3] Launching Game...")
-    try:
-        small_world_graph.launch_explorer(GRAPH_FILE)
-    except KeyboardInterrupt:
-        pass
+        if choice == '1':
+            res = launch_cli_explorer(G)
+            if res and res[0] is not None:
+                success, path, opt_path = res
+                log_game_result(args, "human", success, path, opt_path)
+        elif choice == '2':
+            success, path, opt_path = play_greedy_game(G, embeddings)
+            print(f"\\nGreedy Algorithm Success: {success}")
+            print(f"Greedy Path: {' -> '.join(path)}")
+            print(f"Optimal Path: {' -> '.join(opt_path)}")
+            log_game_result(args, "greedy", success, path, opt_path)
+        elif choice == '3':
+            break
 
 if __name__ == "__main__":
     main()
