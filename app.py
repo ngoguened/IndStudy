@@ -462,3 +462,11 @@ else:
                         args=(option,),
                         use_container_width=True
                     )
+
+st.divider()
+st.markdown("""
+### How to Play
+**Objective:** Navigate from the **Start Word** to the **Target Word** using the fewest steps possible. The available words will generally be closely connected to your current word.
+
+💡 **Tip:** Try moving from a broad category down to a specific item.
+""")
