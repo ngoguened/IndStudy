@@ -363,8 +363,8 @@ def render_dynamic_metric(label, value):
     st.markdown(
         f"""
         <div data-testid="stMetric" style="display: flex; flex-direction: column; gap: 0.25rem;">
-            <label data-testid="stMetricLabel" style="font-size: 0.875rem; color: rgba(250, 250, 250, 0.6);">{label}</label>
-            <div data-testid="stMetricValue" style="font-size: {font_size}; font-weight: 700; line-height: 1.2; color: rgb(250, 250, 250);">{value}</div>
+            <label data-testid="stMetricLabel" style="font-size: 0.875rem; opacity: 0.6;">{label}</label>
+            <div data-testid="stMetricValue" style="font-size: {font_size}; font-weight: 700; line-height: 1.2;">{value}</div>
         </div>
         """,
         unsafe_allow_html=True

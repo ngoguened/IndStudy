@@ -125,8 +125,37 @@ def load_embeddings(embedding_file):
         embeddings = pickle.load(f)
     return embeddings
 
-def get_words_and_vectors(embeddings):
-    """Converts the embedding dict into list of words and numpy array of vectors."""
-    words = list(embeddings.keys())
-    vectors = np.array(list(embeddings.values()), dtype='float32')
+def get_words_and_vectors(embeddings, filter_dict=True):
+    """Converts the embedding dict into list of words and numpy array of vectors, optionally filtering non-dictionary words."""
+    if filter_dict:
+        try:
+            import nltk
+            from nltk.corpus import words as nltk_words
+            try:
+                valid_words = set(nltk_words.words())
+            except LookupError:
+                nltk.download('words', quiet=True)
+                valid_words = set(nltk_words.words())
+            
+            # Words in the nltk corpus are typically lowercase
+            valid_words_lower = {w.lower() for w in valid_words}
+            
+            filtered_words = []
+            filtered_vectors = []
+            for word, vector in embeddings.items():
+                if word.lower() in valid_words_lower:
+                    filtered_words.append(word)
+                    filtered_vectors.append(vector)
+            
+            words = filtered_words
+            vectors = np.array(filtered_vectors, dtype='float32')
+            print(f"Filtered dictionary: kept {len(words)} out of {len(embeddings)} words.")
+        except ImportError:
+            print("Warning: nltk not installed. Skipping dictionary filtering.")
+            words = list(embeddings.keys())
+            vectors = np.array(list(embeddings.values()), dtype='float32')
+    else:
+        words = list(embeddings.keys())
+        vectors = np.array(list(embeddings.values()), dtype='float32')
+        
     return words, vectors
