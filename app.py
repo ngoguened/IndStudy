@@ -72,13 +72,36 @@ def insert_game_result(conn, k_val, n_val, start_word, target_word, steps_taken,
     except Exception as e:
         st.error(f"Failed to log game result to database: {e}")
 
+from supabase import create_client, Client
+
 @st.cache_resource
-def load_graph(k, n):
-    """Loads and caches the NetworkX graph from file based on k and n."""
-    graph_path = os.path.join(DATA_DIR, f"graph_gemini_inv_knn+n_probabilistic_k{k}_n{n}.gexf")
+def fetch_graph_data(k, n):
+    """Loads and caches the NetworkX graph from Supabase Storage or local file."""
+    file_name = f"graph_gemini_inv_knn+n_probabilistic_k{k}_n{n}.gexf"
+    graph_path = os.path.join(DATA_DIR, file_name)
+    
+    # Ensure data directory exists
+    os.makedirs(DATA_DIR, exist_ok=True)
+    
+    # If the file isn't locally cached, download it from Supabase Storage
     if not os.path.exists(graph_path):
-        st.error(f"Error: {graph_path} not found.")
-        return None
+        try:
+            # Initialize Supabase client
+            url: str = st.secrets["SUPABASE_URL"]
+            key: str = st.secrets["SUPABASE_KEY"]
+            supabase: Client = create_client(url, key)
+            
+            with st.spinner(f"Downloading graph {k}-{n} from cloud..."):
+                # Download file from the 'graphs' bucket
+                res = supabase.storage.from_("graphs").download(file_name)
+                
+                # Save to local file
+                with open(graph_path, 'wb') as f:
+                    f.write(res)
+        except Exception as e:
+            st.error(f"Error downloading graph from Supabase: {e}\n\nMake sure your .streamlit/secrets.toml has SUPABASE_URL and SUPABASE_KEY configured, and that the 'graphs' bucket exists.")
+            return None
+            
     try:
         G = nx.read_gexf(graph_path)
         return G
@@ -140,7 +163,7 @@ if 'graph_k' not in st.session_state:
     st.session_state.db_logged = False
 
 # Load graph
-G = load_graph(st.session_state.graph_k, st.session_state.graph_n)
+G = fetch_graph_data(st.session_state.graph_k, st.session_state.graph_n)
 
 if G is None:
     st.stop()
