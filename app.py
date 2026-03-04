@@ -34,7 +34,7 @@ GRAPH_CONFIGS = [
 # Database Setup
 def init_db():
     try:
-        conn = st.connection("postgresql", type="sql")
+        conn = st.connection("postgresql", type="sql", autocommit=True)
         with conn.session as s:
             s.execute(text("""
                 CREATE TABLE IF NOT EXISTS game_results (
@@ -50,27 +50,38 @@ def init_db():
                     success BOOLEAN
                 );
             """))
-            s.commit()
         return conn
     except Exception as e:
         st.warning(f"Database connection not configured or failed: {e}")
         return None
 
-def insert_game_result(conn, k_val, n_val, start_word, target_word, steps_taken, optimal_dist, path_taken, success):
+def upsert_game_result(conn, db_id, k_val, n_val, start_word, target_word, steps_taken, optimal_dist, path_taken, success):
     if conn is None:
-        return
+        return db_id
     try:
         with conn.session as s:
-            s.execute(text("""
-                INSERT INTO game_results (k_val, n_val, start_word, target_word, steps_taken, optimal_dist, path_taken, success)
-                VALUES (:k, :n, :start, :target, :steps, :opt, :path, :success)
-            """), {
-                "k": k_val, "n": n_val, "start": start_word, "target": target_word, 
-                "steps": steps_taken, "opt": optimal_dist, "path": json.dumps(path_taken), "success": success
-            })
-            s.commit()
+            if db_id is None:
+                result = s.execute(text("""
+                    INSERT INTO game_results (k_val, n_val, start_word, target_word, steps_taken, optimal_dist, path_taken, success)
+                    VALUES (:k, :n, :start, :target, :steps, :opt, :path, :success)
+                    RETURNING id
+                """), {
+                    "k": k_val, "n": n_val, "start": start_word, "target": target_word, 
+                    "steps": steps_taken, "opt": optimal_dist, "path": json.dumps(path_taken), "success": success
+                })
+                return result.scalar()
+            else:
+                s.execute(text("""
+                    UPDATE game_results 
+                    SET steps_taken = :steps, path_taken = :path, success = :success
+                    WHERE id = :id
+                """), {
+                    "steps": steps_taken, "path": json.dumps(path_taken), "success": success, "id": db_id
+                })
+                return db_id
     except Exception as e:
         st.error(f"Failed to log game result to database: {e}")
+        return db_id
 
 from supabase import create_client, Client
 
@@ -148,10 +159,12 @@ def initialize_game(G):
     st.session_state.game_over = False
     st.session_state.success = False
     st.session_state.db_logged = False
+    st.session_state.db_id = None
+    st.session_state.last_logged_step = 0
 
 def restart_game():
     """Callback to reset the game state."""
-    for key in ['start_word', 'target_word', 'current_word', 'path', 'optimal_path', 'optimal_dist', 'game_over', 'success', 'graph_k', 'graph_n', 'db_logged']:
+    for key in ['start_word', 'target_word', 'current_word', 'path', 'optimal_path', 'optimal_dist', 'game_over', 'success', 'graph_k', 'graph_n', 'db_logged', 'db_id', 'last_logged_step']:
         if key in st.session_state:
             del st.session_state[key]
 
@@ -189,9 +202,22 @@ if not st.session_state.game_over:
         st.session_state.success = False
 
 # Database Logging
+should_log = False
+success_val = None
+
 if st.session_state.game_over and not st.session_state.db_logged:
-    insert_game_result(
-        conn, 
+    should_log = True
+    success_val = st.session_state.success
+    st.session_state.db_logged = True
+elif not st.session_state.game_over and steps_taken > 2 and st.session_state.get('last_logged_step') != steps_taken:
+    should_log = True
+    success_val = None
+    st.session_state.last_logged_step = steps_taken
+
+if should_log:
+    st.session_state.db_id = upsert_game_result(
+        conn,
+        st.session_state.get('db_id'),
         st.session_state.graph_k, 
         st.session_state.graph_n, 
         st.session_state.start_word, 
@@ -199,9 +225,8 @@ if st.session_state.game_over and not st.session_state.db_logged:
         steps_taken, 
         st.session_state.optimal_dist, 
         st.session_state.path, 
-        st.session_state.success
+        success_val
     )
-    st.session_state.db_logged = True
 
 # UI: Status Information
 col1, col2 = st.columns(2)
