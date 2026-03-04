@@ -13,13 +13,27 @@ import numpy as np
 # App configuration
 st.set_page_config(page_title="10kwords Challenge Mode", page_icon="🕸️", layout="centered")
 
-# Custom CSS for bigger buttons
+# Custom CSS for bigger buttons and dynamic text resizing
 st.markdown("""
 <style>
 div[data-testid="stButton"] button {
     min-height: 60px;
     font-size: 18px;
     font-weight: bold;
+}
+/* Ensure the metric value container handles flex/wrap properly */
+[data-testid="stMetricValue"] {
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* Basic fluid typography fallback */
+    font-size: clamp(1rem, 5vw, 2.5rem); 
+}
+/* Ensure the text breaks inside instead of cutting off if absolutely necessary */
+[data-testid="stMetricValue"] > div {
+    word-break: break-word;
+    white-space: normal;
+    line-height: 1.2;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -336,15 +350,35 @@ if should_log:
         success_val
     )
 
+# Helper to render metric with specific font size based on length
+def render_dynamic_metric(label, value):
+    length = len(str(value))
+    if length > 12:
+        font_size = "1.5rem"
+    elif length > 8:
+        font_size = "2rem"
+    else:
+        font_size = "2.5rem"
+        
+    st.markdown(
+        f"""
+        <div data-testid="stMetric" style="display: flex; flex-direction: column; gap: 0.25rem;">
+            <label data-testid="stMetricLabel" style="font-size: 0.875rem; color: rgba(250, 250, 250, 0.6);">{label}</label>
+            <div data-testid="stMetricValue" style="font-size: {font_size}; font-weight: 700; line-height: 1.2; color: rgb(250, 250, 250);">{value}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
 # UI: Status Information
 col1, col2, col3 = st.columns(3)
 with col1:
     if steps_taken == 0:
-        st.metric(label="Start Word", value=st.session_state.start_word.upper())
+        render_dynamic_metric("Start Word", st.session_state.start_word.upper())
     else:
-        st.metric(label="Current Word", value=st.session_state.current_word.upper())
+        render_dynamic_metric("Current Word", st.session_state.current_word.upper())
 with col2:
-    st.metric(label="Target Word", value=st.session_state.target_word.upper())
+    render_dynamic_metric("Target Word", st.session_state.target_word.upper())
 with col3:
     st.metric(label="Steps", value=f"{steps_taken} / {max_steps}")
 
