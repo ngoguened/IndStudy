@@ -383,7 +383,7 @@ with col3:
     st.metric(label="Steps", value=f"{steps_taken} / {max_steps}")
 
 # Display current path
-st.write("**Current path:** " + " -> ".join(st.session_state.path))
+st.write(" -> ".join(st.session_state.path))
 
 # Game over screens
 if st.session_state.game_over:
