@@ -23,7 +23,7 @@ div[data-testid="stButton"] button {
 """, unsafe_allow_html=True)
 
 # Paths & Graphs
-DATA_DIR = "/home/nicholas/IdeaProjects/IndStudy/10kwords/data"
+DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 GRAPH_CONFIGS = [
     {"k": 20, "n": 5},
     {"k": 15, "n": 10},
