@@ -339,13 +339,14 @@ if should_log:
 # UI: Status Information
 col1, col2, col3 = st.columns(3)
 with col1:
-    st.metric(label="Start Word", value=st.session_state.start_word.upper())
+    if steps_taken == 0:
+        st.metric(label="Start Word", value=st.session_state.start_word.upper())
+    else:
+        st.metric(label="Current Word", value=st.session_state.current_word.upper())
 with col2:
     st.metric(label="Target Word", value=st.session_state.target_word.upper())
 with col3:
     st.metric(label="Steps", value=f"{steps_taken} / {max_steps}")
-
-st.markdown(f"**Current Location:**  `{st.session_state.current_word.upper()}`")
 
 # Display current path
 with st.expander("Show current path"):
