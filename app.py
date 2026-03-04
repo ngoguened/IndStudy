@@ -7,6 +7,8 @@ import json
 from sqlalchemy import text
 from st_keyup import st_keyup
 import streamlit.components.v1 as components
+import pickle
+import numpy as np
 
 # App configuration
 st.set_page_config(page_title="10kwords Challenge Mode", page_icon="🕸️", layout="centered")
@@ -120,6 +122,110 @@ def fetch_graph_data(k, n):
         st.error(f"Error reading GEXF: {e}")
         return None
 
+@st.cache_resource
+def fetch_embeddings_data():
+    """Loads and caches word embeddings from Supabase Storage or local file."""
+    file_name = "embeddings_gemini.pkl"
+    embeddings_path = os.path.join(DATA_DIR, file_name)
+    
+    os.makedirs(DATA_DIR, exist_ok=True)
+    
+    # Fast path: If the combined file exists locally, just load it.
+    if os.path.exists(embeddings_path):
+        try:
+            with open(embeddings_path, 'rb') as f:
+                return pickle.load(f)
+        except Exception as e:
+            st.error(f"Error reading local embeddings: {e}")
+            return None
+
+    # If not, we download the 3 chunks from Supabase, merge them, and save.
+    try:
+        url: str = st.secrets["SUPABASE_URL"]
+        key: str = st.secrets["SUPABASE_KEY"]
+        supabase: Client = create_client(url, key)
+    except Exception as e:
+        st.error(f"Failed to initialize Supabase client: {e}")
+        return None
+        
+    combined_embeddings = {}
+    for i in range(1, 4):
+        part_name = f"embeddings_gemini_part{i}.pkl"
+        part_path = os.path.join(DATA_DIR, part_name)
+        
+        if not os.path.exists(part_path):
+            try:
+                with st.spinner(f"Downloading word embeddings part {i}/3 from cloud (approx 40MB)..."):
+                    res = supabase.storage.from_("graphs").download(part_name)
+                    with open(part_path, 'wb') as f:
+                        f.write(res)
+            except Exception as e:
+                st.error(f"Error downloading {part_name} from Supabase: {e}")
+                return None
+                
+        try:
+            with open(part_path, 'rb') as f:
+                part_data = pickle.load(f)
+                combined_embeddings.update(part_data)
+        except Exception as e:
+            st.error(f"Error reading {part_name}: {e}")
+            return None
+            
+    # Save the combined embeddings locally so future loads are fast
+    try:
+        with open(embeddings_path, 'wb') as f:
+            pickle.dump(combined_embeddings, f)
+    except Exception as e:
+        pass # Not critical if we can't save the combined file, we can still return it
+        
+    return combined_embeddings
+
+def get_cosine_sim(vec_a, vec_b):
+    return float(np.dot(vec_a, vec_b) / (np.linalg.norm(vec_a) * np.linalg.norm(vec_b)))
+
+def compute_greedy_path(G, embeddings, start_word, target_word, max_steps=20):
+    if not embeddings:
+        return []
+    
+    path = [start_word]
+    current_word = start_word
+    visited = {start_word}
+    
+    target_vec = embeddings.get(target_word)
+    if target_vec is None:
+        return path
+        
+    for _ in range(max_steps):
+        if current_word == target_word:
+            break
+            
+        neighbors = []
+        if current_word in G:
+            neighbors = [n for n in G.neighbors(current_word) if n not in visited]
+            
+        if not neighbors:
+            break
+            
+        best_neighbor = None
+        best_score = -2.0
+        
+        for nbr in neighbors:
+            nbr_vec = embeddings.get(nbr)
+            if nbr_vec is not None:
+                score = get_cosine_sim(nbr_vec, target_vec)
+                if score > best_score:
+                    best_score = score
+                    best_neighbor = nbr
+                    
+        if best_neighbor is None:
+            break
+            
+        current_word = best_neighbor
+        path.append(current_word)
+        visited.add(current_word)
+        
+    return path
+
 def get_neighbors(G, current_word):
     """Gets sorted neighbors for the current word."""
     if current_word not in G: 
@@ -161,10 +267,11 @@ def initialize_game(G):
     st.session_state.db_logged = False
     st.session_state.db_id = None
     st.session_state.last_logged_step = 0
+    st.session_state.greedy_path = None
 
 def restart_game():
     """Callback to reset the game state."""
-    for key in ['start_word', 'target_word', 'current_word', 'path', 'optimal_path', 'optimal_dist', 'game_over', 'success', 'graph_k', 'graph_n', 'db_logged', 'db_id', 'last_logged_step']:
+    for key in ['start_word', 'target_word', 'current_word', 'path', 'optimal_path', 'optimal_dist', 'greedy_path', 'game_over', 'success', 'graph_k', 'graph_n', 'db_logged', 'db_id', 'last_logged_step']:
         if key in st.session_state:
             del st.session_state[key]
 
@@ -177,8 +284,9 @@ if 'graph_k' not in st.session_state:
 
 # Load graph
 G = fetch_graph_data(st.session_state.graph_k, st.session_state.graph_n)
+embeddings = fetch_embeddings_data()
 
-if G is None:
+if G is None or embeddings is None:
     st.stop()
 
 # Initialize session state if first run or reset
@@ -246,12 +354,16 @@ with st.expander("Show current path"):
 
 # Game over screens
 if st.session_state.game_over:
+    if st.session_state.greedy_path is None:
+        st.session_state.greedy_path = compute_greedy_path(G, embeddings, st.session_state.start_word, st.session_state.target_word, max_steps=max_steps)
+
     if st.session_state.success:
         st.success(f"**VICTORY!** You reached **{st.session_state.target_word.upper()}** in {steps_taken} steps!")
     else:
         st.error(f"**GAME OVER.** You exceeded the maximum of {max_steps} steps.")
     
-    st.info(f"**Optimal Path ({st.session_state.optimal_dist} steps):**\n" + " -> ".join(st.session_state.optimal_path))
+    greedy_len = len(st.session_state.greedy_path) - 1
+    st.info(f"**Greedy Path ({greedy_len} steps):**\n" + " -> ".join(st.session_state.greedy_path))
     st.button("Play Again", on_click=restart_game, type="primary")
 
 # Ongoing game mechanics
