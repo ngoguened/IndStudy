@@ -462,8 +462,7 @@ else:
         if not filtered_options:
             st.write("No words matching filter.")
         else:
-            # Display as a grid of buttons (2 columns)
-            n_cols = 2
+            n_cols = 3
             for i in range(0, len(filtered_options), n_cols):
                 cols = st.columns(n_cols)
                 for j in range(n_cols):
