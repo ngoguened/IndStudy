@@ -35,16 +35,21 @@ div[data-testid="stButton"] button {
     white-space: normal;
     line-height: 1.2;
 }
-/* Mobile layout optimizations to keep horizontal items side-by-side */
+/* Custom Grid for button rows to handle responsive wrapping without horizontal scroll */
+div[data-testid="stVerticalBlock"]:has(.button-wrapper) div[data-testid="stHorizontalBlock"] {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 1rem;
+    align-items: stretch;
+}
+div[data-testid="stVerticalBlock"]:has(.button-wrapper) div[data-testid="column"] {
+    width: 100% !important;
+    min-width: 0 !important;
+    flex: none !important;
+}
 @media (max-width: 576px) {
-    div[data-testid="stHorizontalBlock"] {
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-    }
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
-        width: auto !important;
-        flex: 1 1 0% !important;
-        min-width: 0 !important;
+    div[data-testid="stVerticalBlock"]:has(.button-wrapper) div[data-testid="stHorizontalBlock"] {
+        grid-template-columns: repeat(2, 1fr) !important;
     }
 }
 </style>
@@ -462,20 +467,18 @@ else:
         if not filtered_options:
             st.write("No words matching filter.")
         else:
-            n_cols = 3
-            for i in range(0, len(filtered_options), n_cols):
-                cols = st.columns(n_cols)
-                for j in range(n_cols):
-                    if i + j < len(filtered_options):
-                        option = filtered_options[i + j]
-                        with cols[j]:
-                            st.button(
-                                option, 
-                                key=f"btn_{option}_{steps_taken}_{i+j}", 
-                                on_click=on_move, 
-                                args=(option,),
-                                use_container_width=True
-                            )
+            with st.container():
+                st.markdown('<div class="button-wrapper"></div>', unsafe_allow_html=True)
+                cols = st.columns(len(filtered_options))
+                for i, option in enumerate(filtered_options):
+                    with cols[i]:
+                        st.button(
+                            option, 
+                            key=f"btn_{option}_{steps_taken}_{i}", 
+                            on_click=on_move, 
+                            args=(option,),
+                            use_container_width=True
+                        )
 
 st.divider()
 st.markdown("""
