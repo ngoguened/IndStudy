@@ -46,6 +46,8 @@ div[data-testid="stVerticalBlock"]:has(> div.element-container .button-wrapper) 
     align-items: stretch;
 }
 
+div[data-testid="stVerticalBlock"]:has(> div.element-container .button-wrapper) div[data-testid="stColumns"] > div,
+div[data-testid="stVerticalBlock"]:has(> div.element-container .button-wrapper) div[data-testid="stHorizontalBlock"] > div,
 div[data-testid="stVerticalBlock"]:has(> div.element-container .button-wrapper) div[data-testid="column"] {
     width: 100% !important;
     min-width: 0 !important;
