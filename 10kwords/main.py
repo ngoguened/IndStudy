@@ -25,8 +25,8 @@ def log_game_result(args, player_type, success, path, opt_path):
     with open(log_file, mode="a", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
         if not file_exists:
-            writer.writerow(["player", "embedding", "algorithm", "k_nn", "n_long", "start", "target", "success", "pth_len", "opt_len", "diff", "path_str"])
-        writer.writerow([player_type, args.embedding, args.graph, args.k, args.n, start_w, target_w, success, path_len, opt_len, diff, path_str])
+            writer.writerow(["player", "embedding", "algorithm", "k_nn", "n_long", "temp", "start", "target", "success", "pth_len", "opt_len", "diff", "path_str"])
+        writer.writerow([player_type, args.embedding, args.graph, args.k, args.n, args.alpha, start_w, target_w, success, path_len, opt_len, diff, path_str])
     print(f"\\n[Logged result to {log_file}]")
 
 def main():
@@ -43,6 +43,7 @@ def main():
                         help="Graph generation algorithm.")
     parser.add_argument("-k", type=int, default=15, help="Number of nearest neighbors to connect.")
     parser.add_argument("-n", type=int, default=10, help="Number of long range edges (random or probabilistic).")
+    parser.add_argument("--alpha", type=float, default=1.0, help="Alpha parameter for probabilistic edges. 1.0 is default, >1 is sharper, <1 is more uniform.")
     
     # Functional specs
     parser.add_argument("--data_dir", type=str, default="data", help="Directory to save/load data.")
@@ -51,7 +52,8 @@ def main():
     # Paths mapped cleanly
     os.makedirs(args.data_dir, exist_ok=True)
     embed_file = os.path.join(args.data_dir, f"embeddings_{args.embedding}.pkl")
-    graph_file = os.path.join(args.data_dir, f"graph_{args.embedding}_{args.graph}_k{args.k}_n{args.n}.gexf")
+    alpha_str = f"_alpha{args.alpha}" if args.alpha != 1.0 else ""
+    graph_file = os.path.join(args.data_dir, f"graph_{args.embedding}_{args.graph}_k{args.k}_n{args.n}{alpha_str}.gexf")
 
     print(f"\\n=== SMALL WORLD PIPELINE: {args.embedding.upper()} -> {args.graph.upper()} ===")
 
@@ -68,7 +70,7 @@ def main():
     if not os.path.exists(graph_file):
         print(f"\\n[2/3] Generating graph using {args.graph} algorithm...")
         words, vectors = get_words_and_vectors(embeddings)
-        G = generate_graph(words, vectors, args.k, args.n, algorithm=args.graph)
+        G = generate_graph(words, vectors, args.k, args.n, algorithm=args.graph, alpha=args.alpha)
         analyze_graph(G)
         save_graph(G, graph_file)
     else:

@@ -4,13 +4,14 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import normalize
 import random
 
-def generate_graph(words, vectors, k, n=0, algorithm="relative_neighborhood"):
+def generate_graph(words, vectors, k, n=0, algorithm="relative_neighborhood", alpha=1.0):
     """
     Builds a small-world graph using one of three specific strategies:
     
     1. 'relative_neighborhood': Pure k-NN graph (Node -> Neighbors)
     2. 'k_nn+n_random': Directed k-NN edges + Uniform Random Long-Range 
     3. 'inv_knn+n_probabilistic': Inverted KNN (Neighbors -> Node) + Weighted Probabilistic Long-Range
+    Alpha is used in 'inv_knn+n_probabilistic' to adjust the probability distribution. default=1.0.
     """
     print(f"--- Building Graph: {len(words)} nodes | Mode={algorithm} | k: {k} | n: {n} ---")
     
@@ -30,7 +31,7 @@ def generate_graph(words, vectors, k, n=0, algorithm="relative_neighborhood"):
     elif algorithm == 'inv_knn+n_probabilistic':
         _add_knn_edges(G, words, vectors, k, inverted=True)
         # Using a fixed chunk size for probabilistic memory efficiency
-        _add_probabilistic_edges(G, words, vectors, n, chunk_size=1000)
+        _add_probabilistic_edges(G, words, vectors, n, alpha=alpha, chunk_size=1000)
         
     else:
         raise ValueError(f"Unknown graph algorithm: {algorithm}")
@@ -91,9 +92,11 @@ def _add_random_edges(G, words, vectors, n, existing_neighbors):
                 exclude.add(candidate)
                 added_count += 1
 
-def _add_probabilistic_edges(G, words, vectors, n, chunk_size):
+def _add_probabilistic_edges(G, words, vectors, n, alpha=1.0, chunk_size=1000):
     """
-    Adds n long-range edges per node based on similarity probability.
+    Adds n long-range edges per node based on similarity probability adjusted by an alpha parameter.
+    If alpha > 1, the probability distribution becomes sharper (favoring highly similar nodes).
+    If alpha < 1, the distribution becomes more uniform.
     """
     for i in range(0, len(words), chunk_size):
         batch = vectors[i : i + chunk_size]
@@ -103,8 +106,10 @@ def _add_probabilistic_edges(G, words, vectors, n, chunk_size):
             global_idx = i + r
             sims[r, global_idx] = 0
             
-        row_sums = sims.sum(axis=1, keepdims=True) + 1e-9
-        probs = sims / row_sums
+        scaled_sims = sims ** alpha if alpha != 1.0 else sims
+            
+        row_sums = scaled_sims.sum(axis=1, keepdims=True) + 1e-9
+        probs = scaled_sims / row_sums
         
         for r in range(len(batch)):
             if probs[r].sum() < 0.01:

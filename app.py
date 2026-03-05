@@ -35,6 +35,18 @@ div[data-testid="stButton"] button {
     white-space: normal;
     line-height: 1.2;
 }
+/* Mobile layout optimizations to keep horizontal items side-by-side */
+@media (max-width: 576px) {
+    div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        width: auto !important;
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -450,17 +462,21 @@ else:
         if not filtered_options:
             st.write("No words matching filter.")
         else:
-            # Display as a grid of buttons (3 columns)
-            cols = st.columns(3)
-            for i, option in enumerate(filtered_options):
-                with cols[i % 3]:
-                    st.button(
-                        option, 
-                        key=f"btn_{option}_{steps_taken}_{i}", 
-                        on_click=on_move, 
-                        args=(option,),
-                        use_container_width=True
-                    )
+            # Display as a grid of buttons (2 columns)
+            n_cols = 2
+            for i in range(0, len(filtered_options), n_cols):
+                cols = st.columns(n_cols)
+                for j in range(n_cols):
+                    if i + j < len(filtered_options):
+                        option = filtered_options[i + j]
+                        with cols[j]:
+                            st.button(
+                                option, 
+                                key=f"btn_{option}_{steps_taken}_{i+j}", 
+                                on_click=on_move, 
+                                args=(option,),
+                                use_container_width=True
+                            )
 
 st.divider()
 st.markdown("""
