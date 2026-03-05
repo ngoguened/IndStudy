@@ -35,20 +35,26 @@ div[data-testid="stButton"] button {
     white-space: normal;
     line-height: 1.2;
 }
+
 /* Custom Grid for button rows to handle responsive wrapping without horizontal scroll */
-div[data-testid="stVerticalBlock"]:has(.button-wrapper) div[data-testid="stHorizontalBlock"] {
+/* Targets specifically the inner vertical block containing the button-wrapper */
+div[data-testid="stVerticalBlock"]:has(> div.element-container .button-wrapper) div[data-testid="stColumns"],
+div[data-testid="stVerticalBlock"]:has(> div.element-container .button-wrapper) div[data-testid="stHorizontalBlock"] {
     display: grid !important;
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 1rem;
     align-items: stretch;
 }
-div[data-testid="stVerticalBlock"]:has(.button-wrapper) div[data-testid="column"] {
+
+div[data-testid="stVerticalBlock"]:has(> div.element-container .button-wrapper) div[data-testid="column"] {
     width: 100% !important;
     min-width: 0 !important;
     flex: none !important;
 }
+
 @media (max-width: 576px) {
-    div[data-testid="stVerticalBlock"]:has(.button-wrapper) div[data-testid="stHorizontalBlock"] {
+    div[data-testid="stVerticalBlock"]:has(> div.element-container .button-wrapper) div[data-testid="stColumns"],
+    div[data-testid="stVerticalBlock"]:has(> div.element-container .button-wrapper) div[data-testid="stHorizontalBlock"] {
         grid-template-columns: repeat(2, 1fr) !important;
     }
 }
