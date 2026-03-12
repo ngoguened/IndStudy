@@ -83,6 +83,7 @@ def init_db():
                     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     k_val INT,
                     n_val INT,
+                    temp FLOAT,
                     start_word VARCHAR(255),
                     target_word VARCHAR(255),
                     steps_taken INT,
@@ -96,18 +97,18 @@ def init_db():
         st.warning(f"Database connection not configured or failed: {e}")
         return None
 
-def upsert_game_result(conn, db_id, k_val, n_val, start_word, target_word, steps_taken, optimal_dist, path_taken, success):
+def upsert_game_result(conn, db_id, k_val, n_val, temp, start_word, target_word, steps_taken, optimal_dist, path_taken, success):
     if conn is None:
         return db_id
     try:
         with conn.session as s:
             if db_id is None:
                 result = s.execute(text("""
-                    INSERT INTO game_results (k_val, n_val, start_word, target_word, steps_taken, optimal_dist, path_taken, success)
-                    VALUES (:k, :n, :start, :target, :steps, :opt, :path, :success)
+                    INSERT INTO game_results (k_val, n_val, temp, start_word, target_word, steps_taken, optimal_dist, path_taken, success)
+                    VALUES (:k, :n, :temp_val, :start, :target, :steps, :opt, :path, :success)
                     RETURNING id
                 """), {
-                    "k": k_val, "n": n_val, "start": start_word, "target": target_word, 
+                    "k": k_val, "n": n_val, "temp_val": temp, "start": start_word, "target": target_word, 
                     "steps": steps_taken, "opt": optimal_dist, "path": json.dumps(path_taken), "success": success
                 })
                 return result.scalar()
@@ -126,10 +127,10 @@ def upsert_game_result(conn, db_id, k_val, n_val, start_word, target_word, steps
 
 from supabase import create_client, Client
 
-@st.cache_resource
-def fetch_graph_data(k, n):
+@st.cache_resource(show_spinner=False)
+def fetch_graph_data(k, n, temp):
     """Loads and caches the NetworkX graph from Supabase Storage or local file."""
-    file_name = f"graph_gemini_inv_knn+n_probabilistic_k{k}_n{n}.gexf"
+    file_name = f"graph_gemini_inv_knn+n_probabilistic_k{k}_n{n}_alpha{temp}.gexf"
     graph_path = os.path.join(DATA_DIR, file_name)
     
     # Ensure data directory exists
@@ -151,7 +152,7 @@ def fetch_graph_data(k, n):
                 with open(graph_path, 'wb') as f:
                     f.write(res)
         except Exception as e:
-            st.error(f"Error downloading graph from Supabase: {e}\n\nMake sure your .streamlit/secrets.toml has SUPABASE_URL and SUPABASE_KEY configured, and that the 'graphs' bucket exists.")
+            st.error(f"Error downloading graph from Supabase for file '{file_name}': {e}\n\nMake sure your .streamlit/secrets.toml has SUPABASE_URL and SUPABASE_KEY configured, and that the 'graphs' bucket exists.")
             return None
             
     try:
@@ -310,19 +311,25 @@ def initialize_game(G):
 
 def restart_game():
     """Callback to reset the game state."""
-    for key in ['start_word', 'target_word', 'current_word', 'path', 'optimal_path', 'optimal_dist', 'greedy_path', 'game_over', 'success', 'graph_k', 'graph_n', 'db_logged', 'db_id', 'last_logged_step']:
+    for key in ['start_word', 'target_word', 'current_word', 'path', 'optimal_path', 'optimal_dist', 'greedy_path', 'game_over', 'success', 'graph_k', 'graph_n', 'graph_temp', 'db_logged', 'db_id', 'last_logged_step']:
         if key in st.session_state:
             del st.session_state[key]
 
 # Initialize graph configuration if first run or reset
 if 'graph_k' not in st.session_state:
-    config = random.choice(GRAPH_CONFIGS)
+    # k=10 or 15 is 3x as likely as k=5 or 20 (GRAPH_CONFIGS is 20, 15, 10, 5)
+    config = random.choices(GRAPH_CONFIGS, weights=[1, 3, 3, 1], k=1)[0]
     st.session_state.graph_k = config['k']
     st.session_state.graph_n = config['n']
     st.session_state.db_logged = False
 
+# Ensure graph_temp is initialized for existing sessions
+if 'graph_temp' not in st.session_state:
+    # temp=0 or 100 is 2x as likely as temp=1 or 10
+    st.session_state.graph_temp = random.choices([0.0, 1.0, 10.0, 100.0], weights=[2, 1, 1, 2], k=1)[0]
+
 # Load graph
-G = fetch_graph_data(st.session_state.graph_k, st.session_state.graph_n)
+G = fetch_graph_data(st.session_state.graph_k, st.session_state.graph_n, st.session_state.graph_temp)
 embeddings = fetch_embeddings_data()
 
 if G is None or embeddings is None:
@@ -367,6 +374,7 @@ if should_log:
         st.session_state.get('db_id'),
         st.session_state.graph_k, 
         st.session_state.graph_n, 
+        st.session_state.graph_temp,
         st.session_state.start_word, 
         st.session_state.target_word, 
         steps_taken, 
