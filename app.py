@@ -11,7 +11,7 @@ import pickle
 import numpy as np
 
 # App configuration
-st.set_page_config(page_title="10kwords Challenge Mode", page_icon="🕸️", layout="centered")
+st.set_page_config(page_title="Traversle", page_icon="〰️", layout="centered")
 
 # Custom CSS for bigger buttons and dynamic text resizing
 st.markdown("""
@@ -341,7 +341,7 @@ if 'start_word' not in st.session_state:
 
 conn = init_db()
 
-st.title("10kwords Challenge Mode")
+st.title("Traversle")
 
 # Determine game status
 steps_taken = len(st.session_state.path) - 1
