@@ -429,7 +429,7 @@ if st.session_state.game_over:
         st.error(f"**GAME OVER.** You exceeded the maximum of {max_steps} steps.")
     
     greedy_len = len(st.session_state.greedy_path) - 1
-    st.info(f"**Greedy Path ({greedy_len} steps):**\n" + " -> ".join(st.session_state.greedy_path))
+    st.info(f"**Computer Path ({greedy_len} steps):**\n" + " -> ".join(st.session_state.greedy_path))
     st.button("Play Again", on_click=restart_game, type="primary")
 
 # Ongoing game mechanics
